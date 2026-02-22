@@ -1,0 +1,20 @@
+Devolutions Server has been deployed.
+
+  Hostname: {{ include "devolutions-server.hostname" . }}
+  Namespace: {{ .Release.Namespace }}
+
+{{- if .Values.certificate.enabled }}
+
+A cert-manager Certificate resource has been created.
+Check its status with:
+
+  kubectl get certificate {{ include "devolutions-server.certificateName" . }} -n {{ .Release.Namespace }}
+{{- end }}
+
+Check pod status:
+
+  kubectl get pods -l {{ include "devolutions-server.kubectlSelector" . }} -n {{ .Release.Namespace }}
+
+View logs:
+
+  kubectl logs -l {{ include "devolutions-server.kubectlSelector" . }} -n {{ .Release.Namespace }}

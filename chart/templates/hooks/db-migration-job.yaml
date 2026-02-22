@@ -1,0 +1,134 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}-db-migration
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+    component: db-migration
+  annotations:
+    # Helm hooks - run before upgrade
+    "helm.sh/hook": pre-upgrade
+    # Run migration as a pre-hook after RBAC and scale-down hooks
+    "helm.sh/hook-weight": "-5"
+    # Delete previous job before creating new one, cleanup on success
+    # Failed jobs are kept for debugging (cleaned up on next upgrade or by TTL)
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "devolutions-server.selectorLabels" . | nindent 8 }}
+        component: db-migration
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: db-migration
+          image: "{{ include "devolutions-server.migration.imageRepository" . }}:{{ include "devolutions-server.migration.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # Database Configuration
+            - name: {{ .Values.database.envPrefix }}_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.database.usernameSecretKey }}
+            - name: {{ .Values.database.envPrefix }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.database.passwordSecretKey }}
+            - name: {{ .Values.database.envPrefix }}_HOST
+              value: {{ include "devolutions-server.databaseHost" . | quote }}
+            - name: {{ .Values.database.envPrefix }}_NAME
+              value: {{ include "devolutions-server.databaseName" . | quote }}
+            - name: {{ .Values.database.envPrefix }}_PORT
+              value: {{ .Values.database.port | quote }}
+
+            # Migration Configuration
+            - name: DVLS_UPDATE_MODE
+              value: "true"
+            - name: DVLS_BACKUP_PATH
+              value: {{ .Values.migration.backupPath | quote }}
+            - name: DVLS_PATH
+              value: {{ .Values.dvls.path | quote }}
+
+            # Web configuration (required by entrypoint)
+            - name: WEB_SCHEME
+              value: {{ .Values.web.scheme | quote }}
+            - name: PORT
+              value: {{ .Values.web.port | quote }}
+            - name: HOSTNAME
+              value: {{ include "devolutions-server.hostname" . | quote }}
+
+            {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+            # TLS Certificate Configuration
+            - name: TLS_CERTIFICATE_FILE
+              value: /etc/certs/tls.crt
+            - name: TLS_PRIVATE_KEY_FILE
+              value: /etc/certs/tls.key
+            {{- end }}
+
+            # Encryption Configuration
+            - name: DVLS_ENCRYPTION_CONFIG_B64
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.dvls.encryptionConfigSecretKey }}
+
+          volumeMounts:
+            {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+            - name: tls-certs
+              mountPath: /etc/certs
+              readOnly: true
+            {{- end }}
+            - name: dvls-backup
+              mountPath: {{ .Values.migration.backupPath }}
+
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .Values.migration.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      volumes:
+        {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+        - name: tls-certs
+          secret:
+            secretName: {{ include "devolutions-server.certificateSecretName" . }}
+            defaultMode: 0444
+        {{- end }}
+        - name: dvls-backup
+          emptyDir:
+            sizeLimit: {{ .Values.migration.backupVolumeSizeLimit }}
+{{- end }}

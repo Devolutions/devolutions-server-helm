@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+  selector:
+    matchLabels:
+      {{- include "devolutions-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "devolutions-server.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ include "devolutions-server.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: https
+              protocol: TCP
+          env:
+            # DVLS Configuration
+            - name: DVLS_INIT
+              value: "false"
+            - name: DVLS_ADMIN_USERNAME
+              value: {{ .Values.dvls.admin.username | quote }}
+            - name: DVLS_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.dvls.admin.passwordSecretKey }}
+            - name: DVLS_ADMIN_EMAIL
+              value: {{ required "dvls.admin.email is required" .Values.dvls.admin.email | quote }}
+            - name: DVLS_PATH
+              value: {{ .Values.dvls.path | quote }}
+            - name: HOSTNAME
+              value: {{ include "devolutions-server.hostname" . | quote }}
+
+            # Database Configuration
+            - name: {{ .Values.database.envPrefix }}_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.database.usernameSecretKey }}
+            - name: {{ .Values.database.envPrefix }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.database.passwordSecretKey }}
+            - name: {{ .Values.database.envPrefix }}_HOST
+              value: {{ include "devolutions-server.databaseHost" . | quote }}
+            - name: {{ .Values.database.envPrefix }}_NAME
+              value: {{ include "devolutions-server.databaseName" . | quote }}
+            - name: {{ .Values.database.envPrefix }}_PORT
+              value: {{ .Values.database.port | quote }}
+
+            # Web Configuration
+            - name: WEB_SCHEME
+              value: {{ .Values.web.scheme | quote }}
+            - name: PORT
+              value: {{ .Values.web.port | quote }}
+            - name: EXTERNAL_WEB_SCHEME
+              value: {{ .Values.web.externalScheme | quote }}
+            - name: EXTERNAL_WEB_PORT
+              value: {{ .Values.web.externalPort | quote }}
+
+            # ASP.NET Core Configuration
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.aspnetcore.environment | quote }}
+            - name: ASPNETCORE_URLS
+              value: "{{ .Values.web.scheme }}://0.0.0.0:{{ .Values.web.port }}"
+            - name: DOTNET_RUNNING_IN_CONTAINER
+              value: "true"
+            - name: SCHEDULER_EMBEDDED
+              value: "true"
+
+            # Security and Telemetry
+            - name: DVLS_TELEMETRY
+              value: {{ .Values.dvls.telemetry | quote }}
+            - name: DVLS_ENCRYPTION_CONFIG_B64
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.dvls.encryptionConfigSecretKey }}
+
+            {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+            # TLS Certificate Configuration (from cert-manager)
+            - name: TLS_CERTIFICATE_FILE
+              value: /etc/certs/tls.crt
+            - name: TLS_PRIVATE_KEY_FILE
+              value: /etc/certs/tls.key
+            {{- end }}
+
+          {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/certs
+              readOnly: true
+          {{- end }}
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.targetPort }}
+              scheme: HTTPS
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.targetPort }}
+              scheme: HTTPS
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            successThreshold: {{ .Values.probes.readiness.successThreshold }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.targetPort }}
+              scheme: HTTPS
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: {{ include "devolutions-server.certificateSecretName" . }}
+            defaultMode: 0444
+      {{- end }}

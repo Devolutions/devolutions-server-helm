@@ -1,0 +1,21 @@
+{{- if .Values.backendTLSPolicy.enabled }}
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: BackendTLSPolicy
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "devolutions-server.fullname" . }}
+  validation:
+    {{- if .Values.backendTLSPolicy.wellKnownCACertificates }}
+    wellKnownCACertificates: {{ .Values.backendTLSPolicy.wellKnownCACertificates }}
+    {{- else }}
+    caCertificateRefs:
+      {{- toYaml (required "backendTLSPolicy.caCertificateRefs is required when backendTLSPolicy.enabled is true and wellKnownCACertificates is not set" .Values.backendTLSPolicy.caCertificateRefs) | nindent 6 }}
+    {{- end }}
+    hostname: {{ include "devolutions-server.hostname" . }}
+{{- end }}

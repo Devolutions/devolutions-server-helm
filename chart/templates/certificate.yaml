@@ -1,0 +1,17 @@
+{{- if .Values.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "devolutions-server.certificateName" . }}
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+    - {{ include "devolutions-server.hostname" . }}
+  issuerRef:
+    kind: {{ .Values.certificate.issuerKind }}
+    name: {{ required "certificate.issuerName is required when certificate.enabled is true" .Values.certificate.issuerName }}
+  secretName: {{ include "devolutions-server.certificateSecretName" . }}
+  privateKey:
+    rotationPolicy: {{ .Values.certificate.privateKeyRotationPolicy }}
+{{- end }}

@@ -1,0 +1,78 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}-scale-down
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+    component: scale-down
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 180
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "devolutions-server.selectorLabels" . | nindent 8 }}
+        component: scale-down
+    spec:
+      serviceAccountName: {{ include "devolutions-server.fullname" . }}-deployer
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: scale-down
+          image: "{{ .Values.migration.kubectl.image }}:{{ .Values.migration.kubectl.tag }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              DEPLOY_NAME="{{ include "devolutions-server.fullname" . }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+              echo "Scaling down deployment ${DEPLOY_NAME}..."
+              OUTPUT=$(kubectl get deployment "${DEPLOY_NAME}" -n "${NAMESPACE}" 2>&1)
+              EXIT_CODE=$?
+              if [ ${EXIT_CODE} -eq 0 ]; then
+                kubectl scale deployment/"${DEPLOY_NAME}" --replicas=0 -n "${NAMESPACE}"
+                echo "Waiting for rollout to complete..."
+                kubectl rollout status deployment/"${DEPLOY_NAME}" -n "${NAMESPACE}" --timeout=120s
+                echo "Scale down complete"
+              elif echo "${OUTPUT}" | grep -q "NotFound"; then
+                echo "Deployment does not exist yet, skipping scale down"
+              else
+                echo "Failed to query deployment: ${OUTPUT}" >&2
+                exit 1
+              fi
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
