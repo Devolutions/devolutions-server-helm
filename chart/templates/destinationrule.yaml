@@ -1,0 +1,15 @@
+{{- if .Values.destinationRule.enabled }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}-tls
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+spec:
+  host: {{ include "devolutions-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      caCertificates: /etc/ssl/certs/ca-certificates.crt
+      sni: {{ include "devolutions-server.hostname" . }}
+{{- end }}

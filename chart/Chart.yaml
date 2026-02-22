@@ -1,0 +1,15 @@
+apiVersion: v2
+name: devolutions-server
+version: 2025.3.15
+description: Devolutions Server (DVLS) Helm chart
+type: application
+keywords:
+  - devolutions
+  - dvls
+  - password-manager
+home: https://devolutions.net/server/
+maintainers:
+  - name: DevOps
+    url: https://forum.devolutions.net/forums/186/devolutions-server--linux
+icon: https://cdnweb.devolutions.net/cdn-cgi/image/f=auto,w=200,onerror=redirect/web/common/images/icons/sys-secure-access.png
+appVersion: '2025.3.15.0'

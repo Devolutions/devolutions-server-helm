@@ -1,0 +1,203 @@
+# Default values for Devolutions Server
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: devolutions/devolutions-server
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ''
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+nameOverride: ''
+fullnameOverride: ''
+
+# Override selector labels used by Deployment, Service, and hooks.
+# Useful for migrating from an existing release with different labels.
+# Example:
+#   selectorLabels:
+#     app: dvls
+selectorLabels: {}
+
+# DVLS Configuration
+dvls:
+  # External hostname for DVLS (required)
+  hostname: ''
+  # Admin credentials
+  admin:
+    username: dvls-admin
+    email: ''
+    # Key in existingSecret containing the admin password
+    passwordSecretKey: dvls-admin-password
+  # Path inside container
+  path: /opt/devolutions/dvls
+  # Telemetry
+  telemetry: false
+  # Key in existingSecret containing the base64-encoded encryption config
+  encryptionConfigSecretKey: dvls-encryption-config
+
+# Database configuration
+# The DVLS container supports both DATABASE_* and AZURE_SQL_* environment variable
+# prefixes (see entrypoint.ps1). You can set database.usernameSecretKey and
+# database.passwordSecretKey to match whichever convention your secret uses.
+database:
+  # SQL Server hostname (required)
+  host: ''
+  # Database name (required)
+  name: ''
+  port: '1433'
+  # Environment variable prefix for database credentials (DATABASE or AZURE_SQL)
+  envPrefix: DATABASE
+  # Keys in existingSecret containing database credentials
+  usernameSecretKey: db-username
+  passwordSecretKey: db-password
+
+# ASP.NET Core configuration
+aspnetcore:
+  environment: Production
+
+# Web/HTTP configuration
+web:
+  scheme: https
+  port: '5000'
+  externalScheme: https
+  externalPort: '443'
+
+# TLS Certificate configuration
+certificate:
+  # Enable cert-manager Certificate resource
+  enabled: true
+  # Certificate resource name (defaults to <release>-tls)
+  name: ''
+  # Secret name for TLS certificate (defaults to <release>-tls)
+  secretName: ''
+  # ClusterIssuer name (required when certificate.enabled is true)
+  issuerName: ''
+  issuerKind: ClusterIssuer
+  # Private key rotation policy
+  privateKeyRotationPolicy: Always
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+
+# HTTPRoute (Gateway API) configuration
+httproute:
+  enabled: false
+  gateway:
+    name: ''
+    namespace: ''
+    sectionName: ''
+
+# BackendTLSPolicy (Gateway API) - enables TLS from gateway to backend
+backendTLSPolicy:
+  enabled: false
+  # Use well-known CA certificates (e.g., "System") instead of explicit refs
+  wellKnownCACertificates: ''
+  # CA certificate references for backend TLS validation
+  # Required when enabled and wellKnownCACertificates is not set
+  # Example:
+  #   - name: my-ca
+  #     group: ""
+  #     kind: ConfigMap
+  caCertificateRefs: []
+
+# Istio DestinationRule
+destinationRule:
+  enabled: false
+
+# Resource limits
+resources:
+  requests:
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+# Node selector
+nodeSelector: {}
+
+# Affinity rules
+affinity: {}
+
+# Tolerations
+tolerations: []
+
+# Topology spread constraints
+topologySpreadConstraints: []
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+# Probes configuration
+probes:
+  liveness:
+    initialDelaySeconds: 180
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 120
+    periodSeconds: 15
+    timeoutSeconds: 8
+    successThreshold: 1
+    failureThreshold: 3
+  startup:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 8
+    failureThreshold: 60
+
+# Deployment strategy
+strategy:
+  type: Recreate
+
+# Database Migration Job configuration
+migration:
+  # Enable migration job as pre-upgrade hook
+  enabled: true
+  # Image override (defaults to same as main image)
+  image:
+    repository: '' # If empty, uses main image repository
+    tag: '' # If empty, uses main image tag
+  # kubectl image used by the scale-down hook job
+  kubectl:
+    image: bitnami/kubectl
+    tag: latest
+  # Job configuration
+  activeDeadlineSeconds: 600
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 604800
+  # Backup path inside container
+  backupPath: /backup
+  # Backup volume size limit (adjust based on database size)
+  backupVolumeSizeLimit: 2Gi
+  # Resource limits for migration
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+
+# Name of an existing Kubernetes Secret containing all credentials.
+# Required keys: dvls-admin-password, dvls-encryption-config,
+# and the keys specified by database.usernameSecretKey / database.passwordSecretKey.
+existingSecret: devolutions-server

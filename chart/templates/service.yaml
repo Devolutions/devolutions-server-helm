@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devolutions-server.fullname" . }}
+  labels:
+    {{- include "devolutions-server.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: https
+      appProtocol: https
+  selector:
+    {{- include "devolutions-server.selectorLabels" . | nindent 4 }}

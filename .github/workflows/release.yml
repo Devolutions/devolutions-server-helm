@@ -1,0 +1,89 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ['chart/Chart.yaml']
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+
+    steps:
+      - name: Check out ${{ github.repository }}
+        uses: actions/checkout@v4
+
+      - name: Check out Devolutions/actions
+        uses: actions/checkout@v4
+        with:
+          repository: Devolutions/actions
+          ref: v1
+          token: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
+          path: ./.github/workflows
+
+      - name: Set version
+        id: get-version
+        run: echo "version=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag does not already exist
+        run: |
+          if gh release view "v${{ steps.get-version.outputs.version }}" &>/dev/null; then
+            echo "::error::Release v${{ steps.get-version.outputs.version }} already exists. Bump the version in chart/Chart.yaml first."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release
+        uses: ./.github/workflows/create-release
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v${{ steps.get-version.outputs.version }}
+
+  publish-helm-chart:
+    runs-on: ubuntu-latest
+    needs: create-release
+    environment: helm-publish
+
+    steps:
+      - name: Check out ${{ github.repository }}
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package chart
+        run: helm package chart/
+
+      - name: Check out helm-charts repository
+        uses: actions/checkout@v4
+        with:
+          repository: Devolutions/helm-charts
+          token: ${{ secrets.DEVOLUTIONSBOT_WRITE_TOKEN }}
+          path: helm-charts
+
+      - name: Copy chart package
+        run: |
+          mkdir -p helm-charts/devolutions-server
+          cp devolutions-server-*.tgz helm-charts/devolutions-server/
+
+      - name: Update index
+        working-directory: helm-charts
+        run: |
+          if [ -f index.yaml ]; then
+            helm repo index . --url https://devolutions.github.io/helm-charts --merge index.yaml
+          else
+            helm repo index . --url https://devolutions.github.io/helm-charts
+          fi
+
+      - name: Commit and push
+        working-directory: helm-charts
+        run: |
+          git config user.name "devolutionsbot"
+          git config user.email "bot@devolutions.net"
+          git add devolutions-server/devolutions-server-*.tgz index.yaml
+          git commit -m "feat(devolutions-server): add version ${{ needs.create-release.outputs.version }}"
+          git push
