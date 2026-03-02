@@ -29,6 +29,26 @@ helm repo add devolutions https://devolutions.github.io/helm-charts
 helm repo update
 ```
 
+### Release channels
+
+The chart is published in three release channels:
+
+| Channel | Helm version example | `--devel` required | Description |
+|---------|---------------------|--------------------|-------------|
+| **Stable** | `2025.3.15` | No | Production-ready releases |
+| **LTS** | `2025.3.15` | No | Long-term support releases |
+| **Beta** | `2026.1.3-beta` | Yes | Pre-release versions for early testing |
+
+By default, `helm install` and `helm search` only show Stable and LTS versions. To include Beta releases, add the `--devel` flag:
+
+```bash
+# Search for all versions including beta
+helm search repo devolutions/devolutions-server --devel
+
+# Install a specific beta version
+helm install dvls devolutions/devolutions-server --version 2026.1.3-beta
+```
+
 ### Create the required secrets
 
 The chart expects two Kubernetes secrets to exist before installation. Create them using your preferred method (Terraform, Vault, sealed-secrets, etc.). The `kubectl` examples below are for illustration only.

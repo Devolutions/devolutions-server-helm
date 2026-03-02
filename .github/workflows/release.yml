@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get-version.outputs.version }}
+      release_type: ${{ steps.get-version.outputs.release_type }}
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -53,7 +54,11 @@ jobs:
         run: |
           body=$(gh release view "$TAG" --json body -q '.body')
           notes="**Release type: $RELEASE_TYPE**${body:+$'\n\n'$body}"
-          gh release edit "$TAG" --notes "$notes"
+          prerelease_flag=""
+          if [ "$RELEASE_TYPE" = "Beta" ]; then
+            prerelease_flag="--prerelease"
+          fi
+          gh release edit "$TAG" --notes "$notes" $prerelease_flag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: v${{ steps.get-version.outputs.version }}
@@ -70,6 +75,10 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v4
+
+      - name: Add pre-release suffix for Beta
+        if: ${{ needs.create-release.outputs.release_type == 'Beta' }}
+        run: 'sed -i "s/^version: .*/version: ${{ needs.create-release.outputs.version }}-beta/" chart/Chart.yaml'
 
       - name: Package chart
         run: helm package chart/

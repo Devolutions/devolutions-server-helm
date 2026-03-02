@@ -30,10 +30,14 @@ helm template test chart/ \
 
 ## Releasing
 
-Releases are automated via GitHub Actions. Trigger the `release` workflow to:
+Releases are automated via GitHub Actions. When `chart/Chart.yaml` is updated on `master`, the `release` workflow:
 
-1. Create a GitHub release tagged with the chart version from `chart/Chart.yaml`
-2. Package and publish the chart to the [Devolutions Helm repository](https://devolutions.github.io/helm-charts)
+1. Creates a GitHub release tagged with the chart version
+2. Detects the release type (Beta, Stable, LTS) from the commit message
+3. For Beta releases, appends a `-beta` suffix to the chart version and marks the GitHub release as a prerelease
+4. Packages and publishes the chart to the [Devolutions Helm repository](https://devolutions.github.io/helm-charts)
+
+Beta chart versions use a SemVer pre-release identifier (e.g., `2026.1.3-beta`), so Helm only shows them when using `--devel`. See [chart/README.md](chart/README.md#release-channels) for details.
 
 ## License
 
