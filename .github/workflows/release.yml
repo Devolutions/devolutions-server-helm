@@ -26,7 +26,12 @@ jobs:
 
       - name: Set version
         id: get-version
-        run: echo "version=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+          release_type=$(echo "$COMMIT_MSG" | sed -n 's/.*bump \(Beta\|Stable\|LTS\) to.*/\1/p')
+          echo "release_type=${release_type}" >> "$GITHUB_OUTPUT"
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
 
       - name: Check tag does not already exist
         run: |
@@ -42,6 +47,17 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: v${{ steps.get-version.outputs.version }}
+
+      - name: Add release type to notes
+        if: steps.get-version.outputs.release_type != ''
+        run: |
+          body=$(gh release view "$TAG" --json body -q '.body')
+          notes="**Release type: $RELEASE_TYPE**${body:+$'\n\n'$body}"
+          gh release edit "$TAG" --notes "$notes"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.get-version.outputs.version }}
+          RELEASE_TYPE: ${{ steps.get-version.outputs.release_type }}
 
   publish-helm-chart:
     runs-on: ubuntu-latest
