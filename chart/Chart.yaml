@@ -1,6 +1,6 @@
 apiVersion: v2
 name: devolutions-server
-version: 2026.1.6
+version: 2025.3.16
 description: Devolutions Server (DVLS) Helm chart
 type: application
 keywords:
@@ -12,4 +12,4 @@ maintainers:
   - name: DevOps
     url: https://forum.devolutions.net/forums/186/devolutions-server--linux
 icon: https://cdnweb.devolutions.net/cdn-cgi/image/f=auto,w=200,onerror=redirect/web/common/images/icons/sys-secure-access.png
-appVersion: '2026.1.6.0'
+appVersion: '2025.3.16.0'
