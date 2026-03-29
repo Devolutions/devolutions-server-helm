@@ -85,6 +85,10 @@ service:
   type: ClusterIP
   port: 5000
   targetPort: 5000
+  annotations: {}
+
+# Pod annotations
+podAnnotations: {}
 
 # HTTPRoute (Gateway API) configuration
 httproute:
