@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check out Devolutions/actions
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: Devolutions/actions
           ref: v1
@@ -71,10 +71,10 @@ jobs:
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: Add pre-release suffix for Beta
         if: ${{ needs.create-release.outputs.release_type == 'Beta' }}
@@ -84,7 +84,7 @@ jobs:
         run: helm package chart/
 
       - name: Check out helm-charts repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: Devolutions/helm-charts
           token: ${{ secrets.DEVOLUTIONSBOT_WRITE_TOKEN }}
