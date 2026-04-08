@@ -302,6 +302,76 @@ helm rollback dvls -n devolutions-server
 | `securityContext.capabilities.drop` | Linux capabilities to drop | `["ALL"]` |
 | `securityContext.seccompProfile.type` | Seccomp profile type | `RuntimeDefault` |
 
+## Image Signature Verification
+
+Devolutions Server container images are signed with [cosign](https://docs.sigstore.dev/cosign/overview/). You can verify the signature of any image using the public key below:
+
+```
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuyxOC+3ZeSW8eUalDsYQJ7411UJJ
+pvL+FPxCQzgP7XnvX8nuSqN9kgd2qhBOB547Dc75eIkZC0KPm3PRvmkbGQ==
+-----END PUBLIC KEY-----
+```
+
+### Manual verification
+
+```bash
+cosign verify \
+  --key cosign.pub \
+  devolutions/devolutions-server:<tag>
+```
+
+### Kyverno policy
+
+If you use [Kyverno](https://kyverno.io/), you can enforce image signature verification at the cluster level with an `ImageValidatingPolicy`. The example below audits pods in a specific namespace — change `validationActions` to `["Enforce"]` to block unsigned images.
+
+```yaml
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-dvls-image-signatures
+spec:
+  webhookConfiguration:
+    timeoutSeconds: 15
+  evaluation:
+    background:
+      enabled: true
+  validationActions: ["Audit"]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: devolutions-server    # adjust to your namespace
+  matchImageReferences:
+    - glob: "devolutions/devolutions-server:*"
+  credentials:
+    secrets: ["docker-hub"]    # your Docker Hub pull secret
+  attestors:
+    - name: cosign
+      cosign:
+        key:
+          data: |
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuyxOC+3ZeSW8eUalDsYQJ7411UJJ
+            pvL+FPxCQzgP7XnvX8nuSqN9kgd2qhBOB547Dc75eIkZC0KPm3PRvmkbGQ==
+            -----END PUBLIC KEY-----
+  validationConfigurations:
+    required: false
+    verifyDigest: false
+    mutateDigest: false
+  validations:
+    - expression: >-
+        images.containers
+        .filter(image, image.matches("(docker\\.io/)?devolutions/devolutions-server:.*"))
+        .map(image, verifyImageSignatures(image, [attestors.cosign]))
+        .all(e, e > 0)
+      message: "failed image signature verification"
+```
+
 ## Troubleshooting
 
 ### Pod not starting
