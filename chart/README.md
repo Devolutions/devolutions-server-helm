@@ -35,8 +35,8 @@ The chart is published in three release channels:
 
 | Channel | Helm version example | `--devel` required | Description |
 |---------|---------------------|--------------------|-------------|
-| **Stable** | `2025.3.15` | No | Production-ready releases |
-| **LTS** | `2025.3.15` | No | Long-term support releases |
+| **Stable** | `2026.1.14` | No | Production-ready releases |
+| **LTS** | `2025.3.18` | No | Long-term support releases |
 | **Beta** | `2026.1.3-beta` | Yes | Pre-release versions for early testing |
 
 By default, `helm install` and `helm search` only show Stable and LTS versions. To include Beta releases, add the `--devel` flag:
@@ -51,7 +51,7 @@ helm install dvls devolutions/devolutions-server --version 2026.1.3-beta
 
 ### Create the required secrets
 
-The chart expects two Kubernetes secrets to exist before installation. Create them using your preferred method (Terraform, Vault, sealed-secrets, etc.). The `kubectl` examples below are for illustration only.
+The chart expects the following Kubernetes secrets to exist before installation. Create them using your preferred method (Terraform, Vault, sealed-secrets, etc.). The `kubectl` examples below are for illustration only.
 
 **Docker Hub registry credentials** (referenced by `imagePullSecrets`):
 
@@ -60,6 +60,23 @@ kubectl create secret docker-registry docker-hub \
   --docker-server=https://index.docker.io/v1/ \
   --docker-username='<username>' \
   --docker-password='<password>'
+```
+
+**Docker Hardened Image (DHI) registry credentials** — required when `migration.enabled` is `true` (the default), because the scale-down hook pulls `dhi.io/kubectl:1.35-compat`. Skip this if you disable migrations or override `migration.kubectl.image` to a registry you can already pull from.
+
+```bash
+kubectl create secret docker-registry dhi-io \
+  --docker-server=dhi.io \
+  --docker-username='<dhi-username>' \
+  --docker-password='<dhi-password>'
+```
+
+Then list both pull secrets in your values file:
+
+```yaml
+imagePullSecrets:
+  - name: docker-hub
+  - name: dhi-io
 ```
 
 **DVLS credentials** (referenced by `existingSecret`):
@@ -94,10 +111,11 @@ replicaCount: 1
 
 # Overrides the image tag whose default is the chart appVersion
 image:
-  tag: '2025.3.15.0'
+  tag: '2026.1.14.0'
 
 imagePullSecrets:
   - name: docker-hub
+  - name: dhi-io
 
 dvls:
   hostname: dvls.example.com
@@ -281,8 +299,8 @@ helm rollback dvls -n devolutions-server
 | `migration.enabled` | Enable pre-upgrade migration hook | `true` |
 | `migration.image.repository` | Migration image (defaults to main image) | `""` |
 | `migration.image.tag` | Migration image tag (defaults to main tag) | `""` |
-| `migration.kubectl.image` | kubectl image for scale-down job | `bitnami/kubectl` |
-| `migration.kubectl.tag` | kubectl image tag — defaults to `latest`; pin to a specific version compatible with your cluster (current Kubernetes version or n-1) when possible | `latest` |
+| `migration.kubectl.image` | kubectl image for scale-down job (DHI requires `imagePullSecrets` for `dhi.io`) | `dhi.io/kubectl` |
+| `migration.kubectl.tag` | kubectl image tag — `-compat` variant is required because the hook runs `/bin/sh`; pin to your cluster's Kubernetes minor (current or n-1) | `1.35-compat` |
 | `migration.activeDeadlineSeconds` | Migration job deadline (seconds) | `600` |
 | `migration.backoffLimit` | Job backoff limit | `0` |
 | `migration.ttlSecondsAfterFinished` | Job TTL after completion | `604800` |

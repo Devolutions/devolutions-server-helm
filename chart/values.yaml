@@ -181,10 +181,14 @@ migration:
   image:
     repository: '' # If empty, uses main image repository
     tag: '' # If empty, uses main image tag
-  # kubectl image used by the scale-down hook job
+  # kubectl image used by the scale-down hook job.
+  # Default is the Docker Hardened Image (DHI), `-compat` variant which
+  # ships a shell (the scale-down script uses `/bin/sh -c`). DHI requires
+  # registry authentication (`docker login dhi.io`) — when pulling from a
+  # cluster, provide an imagePullSecret for dhi.io via .Values.imagePullSecrets.
   kubectl:
-    image: bitnami/kubectl
-    tag: latest
+    image: dhi.io/kubectl
+    tag: '1.35-compat'
   # Job configuration
   activeDeadlineSeconds: 600
   backoffLimit: 0
