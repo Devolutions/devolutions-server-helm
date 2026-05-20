@@ -29,7 +29,7 @@ jobs:
         id: get-version
         run: |
           echo "version=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-          release_type=$(echo "$COMMIT_MSG" | sed -n 's/.*bump \(Beta\|Stable\|LTS\) to.*/\1/p')
+          release_type=$(echo "$COMMIT_MSG" | sed -n 's/.*bump \(Beta\|Stable\|Lts\) to.*/\1/p')
           echo "release_type=${release_type}" >> "$GITHUB_OUTPUT"
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
