@@ -1,25 +1,27 @@
-apiVersion: apps/v1
-kind: Deployment
+{{- if .Values.initialization.enabled }}
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: {{ include "devolutions-server.fullname" . }}
+  name: {{ include "devolutions-server.fullname" . }}-db-init
   labels:
     {{- include "devolutions-server.labels" . | nindent 4 }}
+    component: db-init
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
-  replicas: {{ .Values.replicaCount }}
-  strategy:
-    type: {{ .Values.strategy.type }}
-  selector:
-    matchLabels:
-      {{- include "devolutions-server.selectorLabels" . | nindent 6 }}
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: {{ .Values.initialization.activeDeadlineSeconds }}
+  backoffLimit: 0
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
         {{- include "devolutions-server.selectorLabels" . | nindent 8 }}
+        component: db-init
     spec:
+      restartPolicy: Never
       automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -37,26 +39,35 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: db-init
           image: "{{ .Values.image.repository }}:{{ include "devolutions-server.imageTag" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - containerPort: {{ .Values.service.targetPort }}
-              name: https
-              protocol: TCP
+          # The entrypoint starts the server once DVLS_INIT completes and never exits on its own,
+          # so the job ends on the completion line it prints.
+          command:
+            - /bin/bash
+            - -c
+            - |
+              "$DVLS_EXECUTABLE_PATH" --container-entrypoint > /tmp/dvls-init.log 2>&1 &
+              pid=$!
+              tail -n +1 -f /tmp/dvls-init.log &
+              while kill -0 "$pid" 2> /dev/null; do
+                if grep -qF 'Initialization completed successfully.' /tmp/dvls-init.log; then
+                  kill "$pid"
+                  exit 0
+                fi
+                sleep 2
+              done
+              grep -qF 'Initialization completed successfully.' /tmp/dvls-init.log
           env:
             # DVLS Configuration
             - name: DVLS_INIT
-              value: "false"
+              value: "true"
             - name: DVLS_ADMIN_USERNAME
               value: {{ .Values.dvls.admin.username | quote }}
             - name: DVLS_ADMIN_PASSWORD
@@ -103,16 +114,6 @@ spec:
             - name: EXTERNAL_WEB_PORT
               value: {{ .Values.web.externalPort | quote }}
 
-            # ASP.NET Core Configuration
-            - name: ASPNETCORE_ENVIRONMENT
-              value: {{ .Values.aspnetcore.environment | quote }}
-            - name: ASPNETCORE_URLS
-              value: "{{ .Values.web.scheme }}://0.0.0.0:{{ .Values.web.port }}"
-            - name: DOTNET_RUNNING_IN_CONTAINER
-              value: "true"
-            - name: SCHEDULER_EMBEDDED
-              value: "true"
-
             # Security and Telemetry
             - name: DVLS_TELEMETRY
               value: {{ .Values.dvls.telemetry | quote }}
@@ -121,52 +122,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: {{ .Values.dvls.encryptionConfigSecretKey }}
-
-            {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
-            # TLS Certificate Configuration (from cert-manager)
-            - name: TLS_CERTIFICATE_FILE
-              value: /etc/certs/tls.crt
-            - name: TLS_PRIVATE_KEY_FILE
-              value: /etc/certs/tls.key
-            {{- end }}
-
-          {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
-          volumeMounts:
-            - name: tls-certs
-              mountPath: /etc/certs
-              readOnly: true
-          {{- end }}
-
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.service.targetPort }}
-              scheme: HTTPS
-            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
-            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
-
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.service.targetPort }}
-              scheme: HTTPS
-            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
-            successThreshold: {{ .Values.probes.readiness.successThreshold }}
-            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
-
-          startupProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.service.targetPort }}
-              scheme: HTTPS
-            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
-            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
 
           {{- with .Values.securityContext }}
           securityContext:
@@ -177,11 +132,4 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-
-      {{- if (include "devolutions-server.tlsSecretEnabled" .) }}
-      volumes:
-        - name: tls-certs
-          secret:
-            secretName: {{ include "devolutions-server.certificateSecretName" . }}
-            defaultMode: 0444
-      {{- end }}
+{{- end }}

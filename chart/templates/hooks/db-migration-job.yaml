@@ -54,6 +54,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             # Database Configuration
+            {{- with .Values.database.type }}
+            - name: DATABASE_TYPE
+              value: {{ . | quote }}
+            {{- end }}
             - name: {{ .Values.database.envPrefix }}_USERNAME
               valueFrom:
                 secretKeyRef:

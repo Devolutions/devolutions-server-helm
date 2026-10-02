@@ -44,10 +44,13 @@ dvls:
 # prefixes (see entrypoint.ps1). You can set database.usernameSecretKey and
 # database.passwordSecretKey to match whichever convention your secret uses.
 database:
-  # SQL Server hostname (required)
+  # Database engine: SqlServer, PostgreSQL or SQLite. Empty uses the container default (SqlServer).
+  type: ''
+  # Database server hostname (required)
   host: ''
   # Database name (required)
   name: ''
+  # Use 5432 with PostgreSQL
   port: '1433'
   # Environment variable prefix for database credentials (DATABASE or AZURE_SQL)
   envPrefix: DATABASE
@@ -204,6 +207,14 @@ migration:
       cpu: 250m
     limits:
       memory: 1Gi
+
+# Database initialization job configuration
+initialization:
+  # Run DVLS with DVLS_INIT=true as a pre-install hook to create the schema and
+  # administrator. Only safe against an empty database; leave disabled when
+  # installing against an existing one.
+  enabled: false
+  activeDeadlineSeconds: 900
 
 # Name of an existing Kubernetes Secret containing all credentials.
 # Required keys: dvls-admin-password, dvls-encryption-config,

@@ -245,9 +245,10 @@ helm rollback dvls -n devolutions-server
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `database.host` | SQL Server hostname (**required**) | `""` |
+| `database.type` | Database engine (`SqlServer`, `PostgreSQL` or `SQLite`); empty uses the container default, `SqlServer` | `""` |
+| `database.host` | Database server hostname (**required**) | `""` |
 | `database.name` | Database name (**required**) | `""` |
-| `database.port` | Database port | `1433` |
+| `database.port` | Database port (`5432` for PostgreSQL) | `1433` |
 | `database.envPrefix` | Environment variable prefix (`DATABASE` or `AZURE_SQL`) | `DATABASE` |
 | `database.usernameSecretKey` | Key in `existingSecret` for DB username | `db-username` |
 | `database.passwordSecretKey` | Key in `existingSecret` for DB password | `db-password` |
@@ -306,6 +307,13 @@ helm rollback dvls -n devolutions-server
 | `migration.ttlSecondsAfterFinished` | Job TTL after completion | `604800` |
 | `migration.backupPath` | Backup mount path | `/backup` |
 | `migration.backupVolumeSizeLimit` | Backup volume size | `2Gi` |
+
+### Initialization
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `initialization.enabled` | Run a pre-install hook with `DVLS_INIT=true` that creates the schema and administrator. Only for an empty database; the encryption config in `existingSecret` must already exist | `false` |
+| `initialization.activeDeadlineSeconds` | Initialization job deadline (seconds) | `900` |
 
 ### Security
 
