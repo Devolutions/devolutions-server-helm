@@ -48,6 +48,8 @@ Pre-upgrade hooks run in weight order to handle migrations safely:
 2. **weight -10** `scale-down-job.yaml` — scales deployment to 0 and waits for rollout
 3. **weight -5** `db-migration-job.yaml` — runs DVLS with `DVLS_UPDATE_MODE=true`
 
+`initialization.enabled` adds a **pre-install** hook, `db-init-job.yaml`, that runs DVLS with `DVLS_INIT=true` against an empty database. The container entrypoint starts the server after initializing and never exits, so the job watches its log for `Initialization completed successfully.` and stops it.
+
 Migrations are enabled by default (`migration.enabled: true`) and can be skipped with `--set migration.enabled=false`.
 
 ### Database Environment Variable Prefix
