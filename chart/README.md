@@ -35,11 +35,11 @@ The chart is published in three release channels:
 
 | Channel | Helm version example | `--devel` required | Description |
 |---------|---------------------|--------------------|-------------|
-| **Stable** | `2026.1.14` | No | Production-ready releases |
-| **LTS** | `2025.3.18` | No | Long-term support releases |
+| **Current** | `2026.1.14` | No | Production-ready releases |
+| **Extended maintenance** | `2025.3.18` | No | Long-term support releases |
 | **Beta** | `2026.1.3-beta` | Yes | Pre-release versions for early testing |
 
-By default, `helm install` and `helm search` only show Stable and LTS versions. To include Beta releases, add the `--devel` flag:
+By default, `helm install` and `helm search` only show Current and Extended maintenance versions. To include Beta releases, add the `--devel` flag:
 
 ```bash
 # Search for all versions including beta
