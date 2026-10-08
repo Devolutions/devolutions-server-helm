@@ -33,7 +33,7 @@ helm template test chart/ \
 Releases are automated via GitHub Actions. When `chart/Chart.yaml` is updated on `master`, the `release` workflow:
 
 1. Creates a GitHub release tagged with the chart version
-2. Detects the release type (Beta, Stable, LTS) from the commit message
+2. Detects the release type (Beta, Current, Extended maintenance) from the commit message
 3. For Beta releases, appends a `-beta` suffix to the chart version and marks the GitHub release as a prerelease
 4. Packages and publishes the chart to the [Devolutions Helm repository](https://devolutions.github.io/helm-charts)
 
