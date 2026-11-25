@@ -9,16 +9,18 @@ on:
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get-version.outputs.version }}
       release_type: ${{ steps.get-version.outputs.release_type }}
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check out Devolutions/actions
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: Devolutions/actions
           ref: v1
@@ -50,7 +52,7 @@ jobs:
           tag: v${{ steps.get-version.outputs.version }}
 
       - name: Add release type to notes
-        if: steps.get-version.outputs.release_type != ''
+        if: ${{ steps.get-version.outputs.release_type != '' }}
         run: |
           body=$(gh release view "$TAG" --json body -q '.body')
           notes="**Release type: $RELEASE_TYPE**${body:+$'\n\n'$body}"
@@ -65,13 +67,15 @@ jobs:
           RELEASE_TYPE: ${{ steps.get-version.outputs.release_type }}
 
   publish-helm-chart:
-    runs-on: ubuntu-latest
-    needs: create-release
     environment: helm-publish
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Helm
         uses: azure/setup-helm@v5
@@ -84,7 +88,7 @@ jobs:
         run: helm package chart/
 
       - name: Check out helm-charts repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: Devolutions/helm-charts
           token: ${{ secrets.DEVOLUTIONSBOT_WRITE_TOKEN }}
@@ -96,19 +100,19 @@ jobs:
           cp devolutions-server-*.tgz helm-charts/devolutions-server/
 
       - name: Update index
-        working-directory: helm-charts
         run: |
           if [ -f index.yaml ]; then
             helm repo index . --url https://devolutions.github.io/helm-charts --merge index.yaml
           else
             helm repo index . --url https://devolutions.github.io/helm-charts
           fi
+        working-directory: helm-charts
 
       - name: Commit and push
-        working-directory: helm-charts
         run: |
           git config user.name "devolutionsbot"
           git config user.email "bot@devolutions.net"
           git add devolutions-server/devolutions-server-*.tgz index.yaml
           git commit -m "feat(devolutions-server): add version ${{ needs.create-release.outputs.version }}"
           git push
+        working-directory: helm-charts
